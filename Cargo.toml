@@ -1,0 +1,31 @@
+[package]
+name = "bevy_first"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.16.0", features = ["dynamic_linking"] }
+
+[package.metadata]
+assets = ["assets/**"]
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+# Optimize aggressively for size ('z' is best, 's' is a good alternative).
+opt-level = 3
+# Enable Link Time Optimization - crucial for removing unused code across crates.
+lto = true
+# Reduce codegen units - can improve optimization but slows down compile time.
+codegen-units = 1
+# Remove panic handling code (program will abort on panic).
+# Ensure this is acceptable for your application.
+panic = 'unwind'
+# Strip debug symbols (usually done by wasm-opt too, but doesn't hurt).
+strip = true
