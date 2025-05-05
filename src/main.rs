@@ -1,16 +1,22 @@
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
 
-// Define a resource to hold the global click count
-#[derive(Resource, Default)] // Derive Resource and Default
-struct ClickCounter {
+#[derive(Resource, Default)]
+struct BoardState {
     count: usize,
-    finished: bool
+    finished: bool,
+}
+
+#[derive(Component)]
+struct CellState {
+    x: usize,
+    y: usize,
+    state: usize,
 }
 
 fn main() {
     App::new()
-        .init_resource::<ClickCounter>()
+        .init_resource::<BoardState>()
         .add_plugins(
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
@@ -27,12 +33,6 @@ fn main() {
         .add_systems(Update, keyboard_input)
         .add_systems(Update, check_board)
         .run();
-}
-#[derive(Component)] 
-struct CellState {
-    x: usize,
-    y: usize,
-    state: usize
 }
 
 fn setup(
@@ -59,21 +59,26 @@ fn setup(
                     ),
                     Transform::from_xyz(x as f32 * 110.0 - 110.0, y as f32 * 110.0 - 135.0, 0.0),
                     Pickable::default(),
-                    CellState { x: x as usize, y: y as usize, state: 0 },
+                    CellState {
+                        x: x as usize,
+                        y: y as usize,
+                        state: 0,
+                    },
                 ))
                 .observe(handle_click_event); // Use the new function here
         }
     }
 
-    commands.spawn(
-        (Text2d::new("Blue Plays"), Transform::from_xyz(0.0, 175.0, 0.0))
-    );
+    commands.spawn((
+        Text2d::new("Blue Plays"),
+        Transform::from_xyz(0.0, 175.0, 0.0),
+    ));
 }
 
 // New function that handles the click event
 fn handle_click_event(
     event: Trigger<Pointer<Pressed>>,
-    mut counter: ResMut<ClickCounter>,
+    mut counter: ResMut<BoardState>,
     mut texts: Query<&mut Text2d>,
     mut sprites: Query<(&mut Sprite, &mut CellState)>,
 ) {
@@ -81,8 +86,8 @@ fn handle_click_event(
         let atlas = sprite.texture_atlas.as_mut().unwrap();
         if counter.finished == false && atlas.index == 0 {
             counter.count += 1;
-            // Calculate the new index (will alternate between 1 and 2)
-            let new_index = (counter.count % 2) + 1; // Use counter.count
+            // Calculate the new index (will alternate between 1 and 2 for the player number)
+            let new_index = (counter.count % 2) + 1;
             atlas.index = new_index;
             cell_state.state = new_index;
             println!(
@@ -94,7 +99,8 @@ fn handle_click_event(
                     "Blue Plays"
                 } else {
                     "Red Plays"
-                }.to_string();
+                }
+                .to_string();
             }
         }
     } else {
@@ -106,7 +112,6 @@ fn handle_click_event(
 }
 
 fn get_winner(cells: Query<&CellState>) -> usize {
-    let mut winner = 0;
     let mut board = [[0; 3]; 3];
 
     for sprite in cells.iter() {
@@ -118,27 +123,28 @@ fn get_winner(cells: Query<&CellState>) -> usize {
     // Check rows and columns
     for i in 0..3 {
         if board[i][0] == board[i][1] && board[i][1] == board[i][2] && board[i][0] != 0 {
-            winner = board[i][0];
-            break;
+            return board[i][0];
         }
         if board[0][i] == board[1][i] && board[1][i] == board[2][i] && board[0][i] != 0 {
-            winner = board[0][i];
-            break;
+            return board[0][i];
         }
     }
 
     // Check diagonals
-    if (board[0][0] == board[1][1] && board[1][1] == board[2][2]) || (board[0][2] == board[1][1] && board[1][1] == board[2][0]) {
-        winner = board[1][1];
+    if (board[0][0] == board[1][1] && board[1][1] == board[2][2] && board[1][1] != 0)
+        || (board[0][2] == board[1][1] && board[1][1] == board[2][0] && board[1][1] != 0)
+    {
+        return board[1][1];
     }
-
-    winner
+    
+    // No winner
+    0
 }
 
 fn check_board(
     cells: Query<&CellState>,
     mut texts: Query<&mut Text2d>,
-    mut counter: ResMut<ClickCounter>,
+    mut counter: ResMut<BoardState>,
 ) {
     if counter.finished {
         return;
@@ -150,7 +156,7 @@ fn check_board(
         let winner_text = if winner == 1 { "Red Wins! (R)eset." } else { "Blue Wins! (R)eset." };
         texts.iter_mut().next().unwrap().0 = winner_text.to_string();
     }
-    if counter.count >= 9 {
+    else if counter.count >= 9 {
         counter.finished = true;
         texts.iter_mut().next().unwrap().0 = "Game Over. (R)eset.".to_string();
     }
@@ -159,7 +165,7 @@ fn check_board(
 fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut query: Query<&mut Sprite>,
-    mut counter: ResMut<ClickCounter>,
+    mut counter: ResMut<BoardState>,
     mut texts: Query<&mut Text2d>,
 ) {
     if keys.just_pressed(KeyCode::KeyR) {
